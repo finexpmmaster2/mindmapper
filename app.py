@@ -220,8 +220,9 @@ def scan_files() -> List[Dict]:
         rel_parts = Path(rel).parts
         if any(p.startswith(".") for p in rel_parts):
             continue
-        # Skip backups folder
-        if rel_parts and rel_parts[0].lower() in ("backups", "backup", ".backups"):
+        # Skip backups folder and common non-content directories
+        SKIP_DIRS = {"backups", "backup", ".backups", ".mindmapper_backups", "node_modules", "__pycache__", "venv", ".venv", "site", "public", "themes"}
+        if rel_parts and any(p.lower() in SKIP_DIRS or p in SKIP_DIRS for p in rel_parts):
             continue
         # Skip license / changelog / legal files
         basename_up = os.path.basename(path).upper()
