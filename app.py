@@ -163,7 +163,7 @@ AGENTS = [
     {"id": "developer",  "name": "Devi (დევი)",   "short": "Devi",  "workspace": f"{WORKSPACE_ROOT}/agents/developer",                    "parent": "main"},
     {"id": "social",     "name": "Soso (სოსო)",   "short": "Soso",  "workspace": f"{WORKSPACE_ROOT}/agents/social",                       "parent": "main"},
     {"id": "maro",       "name": "Maro (მარო)",   "short": "Maro",  "workspace": f"{WORKSPACE_ROOT}/agents/maro",                         "parent": "main"},
-    {"id": "sako",       "name": "საკო",           "short": "Sako",  "workspace": f"{WORKSPACE_ROOT}/agents/sako",                         "parent": "main"},
+    {"id": "sako",       "name": "საკო",           "short": "Sako",  "workspace": f"{WORKSPACE_ROOT}/agents/qa",                           "parent": "main"},
 ]
 
 AGENT_BY_ID  = {a["id"]: a for a in AGENTS}
