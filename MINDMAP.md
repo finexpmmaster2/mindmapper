@@ -3,16 +3,36 @@
 **Tool:** Memory & Mind Mapper  
 **Port:** 8081  
 **Location:** `agents/developer/tools/mindmapper/`  
-**GitHub:** `finexpmmaster2/openclaw-ge` (private)  
+**GitHub:** `finexpmmaster2/mindmapper` (private → going **open source**)  
 **Started:** 2026-03-07  
 **Status:** Active — in testing  
-**Latest commit:** `d67e1dd`
+**Latest commit:** `e1ec6a7`
+
+---
+
+## ⚠️ UNIVERSAL USE — READ BEFORE EVERY CHANGE
+
+**Mind Mapper is intended for public release as an open-source product.**
+
+All fixes, features, and design decisions MUST consider universal use:
+
+- **No hardcoded paths** — use environment variables or config, never absolute paths like `/home/snork/...`
+- **No hardcoded agent names** — agent definitions must come from config, not code constants
+- **No OpenClaw-specific assumptions** — the tool should work with ANY workspace of `.md` files
+- **No private tokens, keys, or credentials** in code or commits
+- **No internal team references** in user-facing strings (UI, error messages, docs)
+- **Config-driven agent list** — read from a config file (e.g., `mindmapper.json`) or auto-detect from directory structure
+- **Graceful defaults** — if no config exists, scan the workspace and create reasonable defaults
+- **Cross-platform** — avoid Linux-only assumptions; test paths on macOS/Windows where possible
+- **Minimal dependencies** — keep to `fastapi` + `uvicorn` only
+
+**Before merging any PR, ask:** "Would this work for someone who just cloned the repo and ran it on their own project?"
 
 ---
 
 ## Purpose
 
-Replace the old memory-base search tool with a visual interactive mind map + editor for all `.md` files in the OpenClaw workspace. Designed for multi-agent OpenClaw deployments.
+Visual interactive mind map + file editor for `.md` workspaces. Originally built for multi-agent OpenClaw deployments, but designed to work with any markdown-based project.
 
 ---
 
@@ -45,15 +65,21 @@ tools/mindmapper/
 
 ---
 
-## Agent Hierarchy (from `openclaw.json`)
+## Agent Hierarchy
+
+Currently hardcoded in `app.py` as `AGENTS` list. **TODO: make config-driven** — read from `mindmapper.json` or auto-detect from workspace directory structure.
 
 ```
-main       (Zaza)   /home/snork/.openclaw/workspace
-├── researcher (Nino)   .../agents/researcher
-├── developer  (Devi)   .../agents/developer
-├── social     (Soso)   .../agents/social
-└── maro       (Maro)   .../agents/maro
+# Current OpenClaw deployment:
+main       (Zaza)   workspace root
+├── researcher (Nino)   agents/researcher
+├── developer  (Devi)   agents/developer
+├── social     (Soso)   agents/social
+├── maro       (Maro)   agents/maro
+└── qa         (Sako)   agents/qa
 ```
+
+**For open-source release:** Agent list should be auto-detected from `agents/*/` subdirectories, with optional `mindmapper.json` override for names, hierarchy, and custom workspace paths.
 
 ---
 
