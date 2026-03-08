@@ -208,7 +208,7 @@ def get_agent_for_file(filepath: str) -> Optional[str]:
         ws = agent["workspace"]
         if filepath.startswith(ws + os.sep) or filepath == ws:
             return agent["id"]
-    return None
+    return "main"  # Workspace root files belong to main agent
 
 
 def scan_files() -> List[Dict]:
