@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🗺️ Mind Mapper — OpenClaw</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a14;--sur:#111124;--sur2:#1a1a32;--bdr:#2a2a4a;
+  --txt:#e0e0f0;--dim:#6677aa;
+  --cy:#00f0ff;--bl:#4488ff;--pu:#9966ff;--gr:#00ff88;--or:#ff8800;--re:#ff4466;
+  --c-agent:#ffffff;--c-soul:#ffd700;--c-heartbeat:#ff4466;--c-agents:#ff66aa;
+  --c-bootstrap:#00ff88;--c-tools:#ff8800;--c-user:#88aaff;--c-identity:#ff66cc;
+  --c-comms:#aaffaa;--c-memory:#6688cc;--c-draft:#cc9944;--c-brand:#cc44ff;
+  --c-task:#ffaa44;--c-readme:#44ddaa;--c-document:#667788;
+}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--txt);
+  font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden}
+
+/* ── Header ── */
+#hdr{position:fixed;top:0;left:0;right:0;height:50px;z-index:100;
+  background:var(--sur);border-bottom:1px solid var(--bdr);
+  display:flex;align-items:center;gap:8px;padding:0 12px}
+#logo{font-size:15px;font-weight:700;color:var(--cy);white-space:nowrap;flex-shrink:0}
+#logo small{color:var(--dim);font-weight:400;font-size:11px;margin-left:4px}
+#sw{flex:1;max-width:340px;position:relative}
+#si{width:100%;height:30px;background:var(--sur2);border:1px solid var(--bdr);
+  border-radius:6px;color:var(--txt);padding:0 28px 0 30px;font-size:13px;outline:none}
+#si:focus{border-color:var(--cy)}
+#sico{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--dim);pointer-events:none}
+#sclr{position:absolute;right:6px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--dim);cursor:pointer;font-size:16px;display:none;padding:0;line-height:1}
+.tg{display:flex;gap:4px;flex-shrink:0}
+.tb{height:26px;padding:0 9px;border-radius:13px;border:1px solid var(--bdr);
+  background:var(--sur2);color:var(--dim);cursor:pointer;font-size:11px;white-space:nowrap;transition:all .15s}
+.tb.oh{color:var(--cy);background:rgba(0,240,255,.1);border-color:var(--cy)}
+.tb.oo{color:var(--bl);background:rgba(68,136,255,.1);border-color:var(--bl)}
+.tb.os{color:var(--pu);background:rgba(153,102,255,.1);border-color:var(--pu)}
+#stat{color:var(--dim);font-size:11px;white-space:nowrap;flex-shrink:0}
+.hbtn{width:26px;height:26px;border-radius:50%;border:1px solid var(--bdr);
+  background:var(--sur2);color:var(--dim);cursor:pointer;font-size:14px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.hbtn:hover{color:var(--cy);border-color:var(--cy)}
+#nls{display:flex;gap:5px;flex-shrink:0}
+.nl{font-size:11px;color:var(--dim);text-decoration:none;background:var(--sur2);
+  border:1px solid var(--bdr);border-radius:5px;padding:3px 8px;white-space:nowrap}
+.nl:hover{color:var(--cy);border-color:var(--cy)}
+
+/* ── Canvas ── */
+#cvs{position:fixed;top:50px;left:0;right:0;bottom:0;overflow:hidden}
+svg{width:100%;height:100%;cursor:grab}
+svg:active{cursor:grabbing}
+/* Hierarchy: thick cyan */
+.eh{stroke:var(--cy);stroke-width:3;fill:none;opacity:.7}
+/* Ownership: thinner blue */
+.eo{stroke:var(--bl);stroke-width:1.5;fill:none;opacity:.45}
+/* Semantic: purple dashed */
+.es{stroke:var(--pu);stroke-width:1;fill:none;stroke-dasharray:6,4;opacity:.28}
+
+.nd{cursor:pointer}
+.nd circle{stroke-width:2.5}
+.nd text{fill:var(--txt);font-size:10px;text-anchor:middle;pointer-events:none;font-family:'Segoe UI',system-ui,sans-serif}
+.nd.agt text{font-size:12px;font-weight:600}
+/* state */
+.nd.dimmed{opacity:.12}
+.nd.filtered{display:none}
+.nd.hit circle{stroke:var(--or)!important;filter:drop-shadow(0 0 7px var(--or))}
+.nd.sel circle{stroke:var(--cy)!important;stroke-width:3.5!important;filter:drop-shadow(0 0 10px var(--cy))}
+.nd.pon circle{stroke:var(--gr)!important;filter:drop-shadow(0 0 8px var(--gr))}
+.nd.poff{opacity:.25}
+.nd.pagt circle{stroke:var(--or)!important;filter:drop-shadow(0 0 10px var(--or))}
+
+/* ── Sidebar ── */
+#sb{position:fixed;top:50px;right:0;bottom:0;width:440px;
+  background:var(--sur);border-left:1px solid var(--bdr);
+  display:flex;flex-direction:column;z-index:50;
+  transform:translateX(100%);transition:transform .2s ease}
+#sb.open{transform:translateX(0)}
+#sbr{position:absolute;left:0;top:0;bottom:0;width:6px;cursor:ew-resize;z-index:1;background:transparent;transition:background .15s}
+#sbr:hover,#sbr.drag{background:rgba(0,240,255,.25)}
+#sbh{padding:11px 13px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:8px;flex-shrink:0}
+#sbico{font-size:19px}
+#sbttl{font-size:13px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#sbsub{font-size:10px;color:var(--dim);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace}
+#sbx{background:none;border:none;color:var(--dim);cursor:pointer;font-size:17px;padding:3px 5px;border-radius:3px}
+#sbx:hover{color:var(--txt)}
+#sbb{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+
+/* File panel */
+#fp{display:flex;flex-direction:column;height:100%;padding:0 13px 10px}
+#fpfind{border:1px solid var(--bdr);border-radius:5px;background:var(--sur2);margin-top:2px;flex-shrink:0}
+#fpfi{outline:none}#fpfi:focus{border-color:var(--cy)!important}
+#fpa{padding:7px 0;display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap}
+#fpta{flex:1;background:var(--bg);color:var(--txt);border:none;outline:none;resize:none;
+  padding:11px 0;font-family:'Consolas','Courier New',monospace;font-size:12px;line-height:1.65;min-height:0}
+#fpft{padding:8px 0;border-top:1px solid var(--bdr);flex-shrink:0;display:flex;gap:6px;align-items:center}
+#fpst{flex:1;font-size:12px}
+
+/* Search panel */
+#sp{overflow-y:auto;height:100%}
+.srf{border-bottom:1px solid var(--bdr)}
+.srfh{padding:8px 13px;display:flex;align-items:center;gap:7px;background:var(--sur2);cursor:pointer;position:sticky;top:0;z-index:1}
+.srfh:hover{background:var(--bdr)}
+.srfn{font-size:13px;font-weight:600;flex:1}
+.srfc{font-size:11px;color:var(--dim);background:var(--bdr);padding:2px 6px;border-radius:10px}
+.srfl{display:none}
+.srfl.op{display:block}
+.srfi{padding:6px 13px 6px 26px;cursor:pointer;border-bottom:1px solid rgba(42,42,74,.35)}
+.srfi:hover{background:var(--sur2)}
+.srfln{font-size:10px;color:var(--dim);margin-bottom:2px}
+.srft{font-size:12px;font-family:'Consolas',monospace}
+.srft em{color:var(--or);font-style:normal;font-weight:600}
+
+/* Propagate panel */
+#pp{padding:13px;overflow-y:auto;height:100%}
+#pp h3{font-size:13px;color:var(--gr);margin-bottom:7px}
+#pp p{font-size:12px;color:var(--dim);margin-bottom:11px;line-height:1.5}
+.ppl{font-size:11px;color:var(--dim);display:block;margin-bottom:4px}
+#ppta{width:100%;height:105px;background:var(--bg);color:var(--txt);
+  border:1px solid var(--bdr);border-radius:5px;padding:8px 10px;
+  font-family:'Consolas',monospace;font-size:12px;resize:vertical;outline:none}
+#ppta:focus{border-color:var(--gr)}
+#pplist{display:flex;flex-direction:column;gap:3px;max-height:200px;overflow-y:auto;margin:9px 0}
+.ppi{display:flex;align-items:center;gap:7px;padding:5px 9px;
+  background:var(--sur2);border-radius:5px;cursor:pointer;border:1px solid transparent}
+.ppi:hover{border-color:var(--bdr)}
+.ppi.on{border-color:var(--gr);background:rgba(0,255,136,.05)}
+.ppin{font-size:12px;flex:1}
+.ppip{font-size:10px;color:var(--dim)}
+#ppft{display:flex;gap:6px;margin-top:4px}
+#ppst{font-size:12px;margin-top:7px}
+
+/* ── Legend + type filter ── */
+#leg{position:fixed;bottom:13px;left:13px;z-index:50;
+  background:rgba(10,10,20,.97);border:1px solid var(--bdr);
+  border-radius:10px;padding:10px 14px;min-width:240px;backdrop-filter:blur(8px)}
+#legt{font-size:12px;font-weight:600;cursor:pointer;user-select:none;
+  display:flex;align-items:center;gap:5px;margin-bottom:0}
+#legb{margin-top:9px;display:grid;grid-template-columns:1fr 1fr;gap:4px 10px}
+.li{display:flex;align-items:center;gap:6px;font-size:12px;
+  cursor:pointer;padding:3px 5px;border-radius:5px;user-select:none;
+  border:1px solid transparent;transition:all .12s}
+.li:hover{background:var(--sur2);border-color:var(--bdr)}
+.li.off{opacity:.3}
+.li.off .lie{text-decoration:line-through}
+.lie{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+.filter-hint{font-size:10px;color:var(--dim);grid-column:1/-1;margin-top:2px;text-align:center}
+.lle{display:flex;align-items:center;gap:7px;font-size:12px;
+  grid-column:1/-1;padding-top:5px;margin-top:2px;border-top:1px solid var(--bdr)}
+.lls{width:28px;height:3px;flex-shrink:0}
+
+/* Buttons */
+.btn{height:28px;padding:0 12px;border-radius:5px;border:none;cursor:pointer;font-size:12px;font-weight:500}
+.bc{background:var(--cy);color:#000}.bc:hover{filter:brightness(1.1)}
+.bg{background:var(--gr);color:#000}.bg:hover{filter:brightness(1.1)}
+.bn{background:var(--sur2);color:var(--txt);border:1px solid var(--bdr)}.bn:hover{border-color:var(--dim)}
+.bd{background:rgba(255,68,102,.12);color:var(--re);border:1px solid rgba(255,68,102,.4)}
+
+/* Toast */
+#tst{position:fixed;bottom:16px;right:16px;z-index:200;
+  background:var(--sur2);border:1px solid var(--bdr);border-radius:8px;
+  padding:8px 13px;font-size:12px;max-width:270px;
+  transform:translateY(60px);opacity:0;transition:all .22s;pointer-events:none}
+#tst.show{transform:translateY(0);opacity:1}
+#tst.ok{border-color:var(--gr);color:var(--gr)}
+#tst.er{border-color:var(--re);color:var(--re)}
+
+/* Spinner */
+#spin{position:fixed;inset:0;z-index:300;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+#spin.h{display:none}
+.ring{width:38px;height:38px;border:3px solid var(--bdr);border-top-color:var(--cy);
+  border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:2px}
+</style>
+</head>
+<body>
+
+<div id="spin"><div class="ring"></div><div style="color:var(--dim);font-size:13px">Scanning workspace…</div></div>
+
+<div id="hdr">
+  <div id="logo">🗺️ Mind Mapper <small>OpenClaw</small></div>
+  <div id="sw">
+    <span id="sico">🔍</span>
+    <input id="si" type="text" placeholder="Search all files…" autocomplete="off">
+    <button id="sclr">×</button>
+  </div>
+  <div class="tg">
+    <button class="tb oh" id="th" title="Agent→Agent hierarchy edges" style="border-left:3px solid var(--cy)">⬡ Hierarchy</button>
+    <button class="tb oo" id="to" title="Agent→File ownership edges" style="border-left:3px solid var(--bl)">📂 Ownership</button>
+    <button class="tb os" id="ts" title="Semantic cross-file links" style="border-left:3px solid var(--pu)">~ Semantic</button>
+    <button class="tb" id="treset" title="Reset layout">↺ Reset</button>
+  </div>
+  <div id="stat">…</div>
+  <button class="hbtn" id="reload" title="Rescan workspace folders and reload graph" style="min-width:80px">↻ Rescan</button>
+  <div id="nls"></div>
+</div>
+
+<div id="cvs"><svg id="svg"><g id="root">
+  <g id="lsem"></g>
+  <g id="lown"></g>
+  <g id="lhir"></g>
+  <g id="lnd"></g>
+</g></svg></div>
+
+<div id="sb">
+  <div id="sbr"></div>
+  <div id="sbh">
+    <span id="sbico">📄</span>
+    <span id="sbttl">—</span>
+    <span id="sbsub"></span>
+    <button id="sbx">×</button>
+  </div>
+  <div id="sbb"></div>
+</div>
+
+<!-- Legend + type filter -->
+<div id="leg">
+  <div id="legt">🗂️ Legend &amp; Filter ▴</div>
+  <div id="legb">
+    <div class="li" data-type="agent"  ><span class="lie">🤖</span><span style="color:var(--c-agent)">Agent</span></div>
+    <div class="li" data-type="soul"   ><span class="lie">🧠</span><span style="color:var(--c-soul)">Soul</span></div>
+    <div class="li" data-type="heartbeat"><span class="lie">💓</span><span style="color:var(--c-heartbeat)">Heartbeat</span></div>
+    <div class="li" data-type="memory"><span class="lie">📅</span><span style="color:var(--c-memory)">Memory</span></div>
+    <div class="li" data-type="tools"  ><span class="lie">🔧</span><span style="color:var(--c-tools)">Tools</span></div>
+    <div class="li" data-type="user"   ><span class="lie">👤</span><span style="color:var(--c-user)">User</span></div>
+    <div class="li" data-type="identity"><span class="lie">🪪</span><span style="color:var(--c-identity)">Identity</span></div>
+    <div class="li" data-type="agents" ><span class="lie">🤝</span><span style="color:var(--c-agents)">Agents</span></div>
+    <div class="li" data-type="draft"  ><span class="lie">📝</span><span style="color:var(--c-draft)">Draft</span></div>
+    <div class="li" data-type="brand"  ><span class="lie">🎨</span><span style="color:var(--c-brand)">Brand</span></div>
+    <div class="li" data-type="comms"  ><span class="lie">📡</span><span style="color:var(--c-comms)">Comms</span></div>
+    <div class="li" data-type="bootstrap"><span class="lie">🚀</span><span style="color:var(--c-bootstrap)">Bootstrap</span></div>
+    <div class="li" data-type="readme" ><span class="lie">📖</span><span style="color:var(--c-readme)">Readme</span></div>
+    <div class="li" data-type="document"><span class="lie">📄</span><span style="color:var(--c-document)">Doc</span></div>
+    <div style="grid-column:1/-1;display:flex;gap:5px;margin-top:3px">
+      <button onclick="selectAllTypes()" style="flex:1;height:22px;font-size:11px;border-radius:4px;border:1px solid var(--bdr);background:var(--sur2);color:var(--gr);cursor:pointer">✓ All</button>
+      <button onclick="deselectAllTypes()" style="flex:1;height:22px;font-size:11px;border-radius:4px;border:1px solid var(--bdr);background:var(--sur2);color:var(--re);cursor:pointer">✗ Files off</button>
+    </div>
+    <div class="filter-hint">Click type to toggle · edges hide with nodes</div>
+    <div class="lle"><div class="lls" style="background:var(--cy)"></div><span>Hierarchy (agent→agent)</span></div>
+    <div class="lle"><div class="lls" style="background:var(--bl)"></div><span>Ownership (agent→file)</span></div>
+    <div class="lle"><div class="lls" style="border-top:2px dashed var(--pu)"></div><span>Semantic link</span></div>
+  </div>
+</div>
+
+<div id="tst"></div>
+
+<script>
+// ── Constants ─────────────────────────────────────────────────────────────────
+const TC={agent:'#ffffff',soul:'#ffd700',heartbeat:'#ff4466',agents:'#ff66aa',
+  bootstrap:'#00ff88',tools:'#ff8800',user:'#88aaff',identity:'#ff66cc',
+  comms:'#aaffaa',memory:'#6688cc',draft:'#cc9944',brand:'#cc44ff',
+  task:'#ffaa44',readme:'#44ddaa',document:'#667788'};
+const TI={agent:'🤖',soul:'🧠',heartbeat:'💓',agents:'🤝',bootstrap:'🚀',
+  tools:'🔧',user:'👤',identity:'🪪',comms:'📡',memory:'📅',
+  draft:'📝',brand:'🎨',task:'✅',readme:'📖',document:'📄'};
+const RA=30, RF=16;
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let G=null, sim=null, NDs=null;
+let showHir=true, showOwn=true, showSem=true;
+let filteredTypes=new Set();   // types currently HIDDEN
+let edgeHir=null, edgeOwn=null, edgeSem=null;  // global edge selections for filter updates
+let propMode=false, propAgent=null, propSel=new Set();
+let curPath=null, dirty=false, origContent='';
+let initPos={};
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+const $=id=>document.getElementById(id);
+const ic=t=>TI[t]||'📄';
+const co=t=>TC[t]||'#667788';
+const rn=d=>d.group==='agent'?RA:RF;
+const ex=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function toast(m,t=''){const e=$('tst');e.textContent=m;e.className='show '+t;clearTimeout(e._t);e._t=setTimeout(()=>e.className='',3000)}
+async function api(p,o={}){const r=await fetch(p,o);if(!r.ok)throw new Error(await r.text());return r.json()}
+
+function isFiltered(d){ return filteredTypes.has(d.type); }
+
+// ── Sidebar helpers ───────────────────────────────────────────────────────────
+function sbOpen(ico,ttl,sub=''){
+  $('sbico').textContent=ico;$('sbttl').textContent=ttl;
+  $('sbsub').textContent=sub;$('sbsub').style.color='var(--dim)';
+  $('sb').classList.add('open');
+}
+function sbClose(){$('sb').classList.remove('open')}
+
+// ── Layout ────────────────────────────────────────────────────────────────────
+function computeLayout(data,W,H){
+  const nm={};data.nodes.forEach(n=>nm[n.id]=n);
+  const agents=data.nodes.filter(n=>n.group==='agent');
+  const main=agents.find(a=>a.agent_id==='main');
+  const subs=agents.filter(a=>a.agent_id!=='main');
+  const cx=W/2, cy=H/2-20;
+  const AR=Math.min(210,W*0.26);
+  if(main){main.x=cx;main.y=cy;}
+  subs.forEach((a,i)=>{
+    const ang=(i/subs.length)*2*Math.PI-Math.PI/2;
+    a.x=cx+Math.cos(ang)*AR; a.y=cy+Math.sin(ang)*AR;
+  });
+  const byAgent={};
+  data.nodes.filter(n=>n.group==='file').forEach(f=>{
+    if(!byAgent[f.agent_id])byAgent[f.agent_id]=[];
+    byAgent[f.agent_id].push(f);
+  });
+  Object.entries(byAgent).forEach(([aid,files])=>{
+    const pn=nm[`agent__${aid}`];if(!pn)return;
+    const FR=Math.max(80,Math.min(165,55+files.length*6));
+    const baseAng=aid==='main'?0:Math.atan2(pn.y-cy,pn.x-cx);
+    const spread=aid==='main'?2*Math.PI:Math.PI*1.25;
+    files.forEach((f,i)=>{
+      const ang=baseAng-spread/2+(i/Math.max(files.length-1,1))*spread;
+      f.x=pn.x+Math.cos(ang)*FR+(Math.random()-.5)*12;
+      f.y=pn.y+Math.sin(ang)*FR+(Math.random()-.5)*12;
+    });
+  });
+  initPos={};data.nodes.forEach(n=>initPos[n.id]={x:n.x||cx,y:n.y||cy});
+}
+
+// ── Build graph ───────────────────────────────────────────────────────────────
+function buildGraph(data){
+  const svg=d3.select('#svg');
+  const W=svg.node().clientWidth||window.innerWidth;
+  const H=(svg.node().clientHeight||(window.innerHeight-50));
+  const root=d3.select('#root');
+  root.selectAll('*').remove();
+  const lSem=root.append('g').attr('id','lsem');
+  const lOwn=root.append('g').attr('id','lown');
+  const lHir=root.append('g').attr('id','lhir');
+  const lNd =root.append('g').attr('id','lnd');
+
+  computeLayout(data,W,H);
+  const nm={};data.nodes.forEach(n=>nm[n.id]=n);
+
+  // Clone edges for simulation
+  const hirLinks=data.hierarchy_edges.map(e=>({...e}));
+  const ownLinks=data.ownership_edges.map(e=>({...e}));
+  const semLinks=data.semantic_edges
+    .filter(e=>{const s=typeof e.source==='object'?e.source.id:e.source; const t=typeof e.target==='object'?e.target.id:e.target; return nm[s]&&nm[t];})
+    .map(e=>({...e}));
+
+  sim=d3.forceSimulation(data.nodes)
+    .force('hir', d3.forceLink(hirLinks).id(d=>d.id).distance(()=>Math.min(200,W*.22)).strength(.35))
+    .force('own', d3.forceLink(ownLinks).id(d=>d.id).distance(90).strength(.55))
+    .force('sem', d3.forceLink(semLinks).id(d=>d.id).distance(200).strength(.01))
+    .force('charge', d3.forceManyBody().strength(d=>d.group==='agent'?-200:-80))
+    .force('collide', d3.forceCollide().radius(d=>rn(d)+16))
+    .alphaDecay(.04).velocityDecay(.5)
+    .on('tick', tick);
+
+  // Hierarchy edges
+  edgeHir = lHir.selectAll('line').data(hirLinks).join('line').attr('class','eh');
+  const he = edgeHir;
+  // Ownership edges
+  edgeOwn = lOwn.selectAll('line').data(ownLinks).join('line').attr('class','eo');
+  const oe = edgeOwn;
+  // Semantic edges
+  edgeSem = lSem.selectAll('path').data(semLinks).join('path').attr('class','es');
+  const se = edgeSem;
+
+  // Nodes
+  const nd=lNd.selectAll('g').data(data.nodes).join('g')
+    .attr('class',d=>'nd'+(d.group==='agent'?' agt':''))
+    .attr('data-id',d=>d.id)
+    .call(d3.drag()
+      .on('start',(ev,d)=>{if(!ev.active)sim.alphaTarget(.2).restart();d.fx=d.x;d.fy=d.y;})
+      .on('drag', (ev,d)=>{d.fx=ev.x;d.fy=ev.y;})
+      .on('end',  (ev,d)=>{if(!ev.active)sim.alphaTarget(0);/* sticky */}))
+    .on('click',(ev,d)=>{ev.stopPropagation();onNodeClick(d);})
+    .on('contextmenu',(ev,d)=>{ev.preventDefault();if(d.group==='agent')startAgentPropMode(d);});
+
+  nd.append('circle').attr('r',d=>rn(d))
+    .attr('fill',d=>co(d.type)+'22').attr('stroke',d=>co(d.type));
+
+  nd.each(function(d){
+    const sz=d.group==='agent'?20:13;
+    d3.select(this).append('foreignObject')
+      .attr('x',-sz/2).attr('y',-sz/2).attr('width',sz).attr('height',sz)
+      .attr('pointer-events','none')
+      .append('xhtml:div')
+      .style('width',sz+'px').style('height',sz+'px')
+      .style('display','flex').style('align-items','center').style('justify-content','center')
+      .style('font-size',(sz-1)+'px').style('line-height','1').style('user-select','none')
+      .text(ic(d.type));
+  });
+
+  nd.append('text').attr('y',d=>rn(d)+13)
+    .text(d=>d.group==='agent'?(d.short||d.label.split(' ')[0]):d.label.replace('.md',''));
+
+  NDs=nd;
+
+  function tick(){
+    he.attr('x1',d=>d.source.x||0).attr('y1',d=>d.source.y||0)
+      .attr('x2',d=>d.target.x||0).attr('y2',d=>d.target.y||0);
+    oe.attr('x1',d=>d.source.x||0).attr('y1',d=>d.source.y||0)
+      .attr('x2',d=>d.target.x||0).attr('y2',d=>d.target.y||0);
+    se.attr('d',d=>{
+      const sx=d.source.x,sy=d.source.y,tx=d.target.x,ty=d.target.y;
+      if(!sx||!sy||!tx||!ty)return '';
+      return `M${sx},${sy}Q${(sx+tx)/2},${(sy+ty)/2-55} ${tx},${ty}`;
+    });
+    nd.attr('transform',d=>`translate(${d.x||0},${d.y||0})`);
+  }
+
+  applyLayers();
+  applyTypeFilter();
+
+  const zoom=d3.zoom().scaleExtent([.08,5]).on('zoom',ev=>root.attr('transform',ev.transform));
+  svg.call(zoom);
+  svg.on('click',()=>{if(!propMode){clearSel();sbClose();}});
+}
+
+function applyLayers(){
+  const lh=$('lhir'),lo=$('lown'),ls=$('lsem');
+  if(lh)lh.style.display=showHir?'':'none';
+  if(lo)lo.style.display=showOwn?'':'none';
+  if(ls)ls.style.display=showSem?'':'none';
+}
+
+function applyTypeFilter(){
+  if(!NDs)return;
+  NDs.classed('filtered',d=>filteredTypes.has(d.type));
+  applyEdgeFilter();
+}
+
+function applyEdgeFilter(){
+  // Hide any edge where either endpoint's type is filtered out
+  const hide=d=>{
+    const s=d.source,t=d.target;
+    if(!s||!t)return 'none';
+    return (filteredTypes.has(typeof s==='object'?s.type:'') || filteredTypes.has(typeof t==='object'?t.type:''))
+      ? 'none' : '';
+  };
+  if(edgeHir) edgeHir.style('display', hide);
+  if(edgeOwn) edgeOwn.style('display', hide);
+  if(edgeSem) edgeSem.style('display', hide);
+}
+
+function selectAllTypes(){
+  filteredTypes.clear();
+  document.querySelectorAll('.li[data-type]').forEach(l=>l.classList.remove('off'));
+  applyTypeFilter();
+}
+
+function deselectAllTypes(){
+  // Hide all file types, keep agents visible
+  ['soul','heartbeat','agents','bootstrap','tools','user','identity',
+   'comms','memory','draft','brand','task','readme','document'].forEach(t=>filteredTypes.add(t));
+  document.querySelectorAll('.li[data-type]').forEach(l=>{
+    if(l.dataset.type!=='agent') l.classList.add('off');
+  });
+  applyTypeFilter();
+}
+
+function resetLayout(){
+  if(!G||!sim)return;
+  G.nodes.forEach(n=>{const p=initPos[n.id];if(p){n.x=p.x;n.y=p.y;n.fx=p.x;n.fy=p.y;}});
+  sim.alphaTarget(.3).restart();
+  setTimeout(()=>{G.nodes.forEach(n=>{n.fx=null;n.fy=null;});sim.alphaTarget(0);},1800);
+}
+
+// ── Load ──────────────────────────────────────────────────────────────────────
+async function load(){
+  $('spin').classList.remove('h');
+  try{
+    G=await api('/api/graph');
+    buildGraph(G);window.G=G;
+    const f=G.nodes.filter(n=>n.group==='file').length;
+    $('stat').textContent=`${f} files · ${G.hierarchy_edges.length} hier · ${G.ownership_edges.length} own · ${G.semantic_edges.length} sem`;
+  }catch(e){toast('Load error: '+e.message,'er');}
+  $('spin').classList.add('h');
+}
+
+// ── Node click ────────────────────────────────────────────────────────────────
+function onNodeClick(d){
+  if(isFiltered(d))return;
+  if(propMode){
+    if(d.group==='file'&&!isFiltered(d))togglePropFile(d);
+    return;
+  }
+  setSel(d.id);
+  if(d.group==='agent'){
+    // If agent has a SOUL.md and it's not filtered, open it directly
+    const soul=G.nodes.find(n=>n.group==='file'&&n.agent_id===d.agent_id&&n.type==='soul'&&!filteredTypes.has(n.type));
+    if(soul){ showFilePanel(soul.path,soul.label,soul.type); setSel(soul.id); }
+    else showAgentPanel(d);
+  }
+  else showFilePanel(d.path,d.label,d.type);
+}
+
+function setSel(id){if(!NDs)return;NDs.classed('sel',d=>d.id===id).classed('dimmed',false);}
+function clearSel(){
+  if(!NDs)return;
+  NDs.classed('sel',false).classed('dimmed',false).classed('hit',false)
+    .classed('pon',false).classed('poff',false).classed('pagt',false);
+  propMode=false;propAgent=null;propSel.clear();
+}
+
+// ── Type filter ───────────────────────────────────────────────────────────────
+document.querySelectorAll('.li[data-type]').forEach(el=>{
+  el.addEventListener('click',()=>{
+    const t=el.dataset.type;
+    if(filteredTypes.has(t)){filteredTypes.delete(t);el.classList.remove('off');}
+    else{filteredTypes.add(t);el.classList.add('off');}
+    applyTypeFilter();
+  });
+});
+
+// ── File panel ────────────────────────────────────────────────────────────────
+async function showFilePanel(path,name,type,fromSearch=false){
+  if(filteredTypes.has(type)){toast(`${type} files are filtered out`,'er');return;}
+  // Show file name as title and full path as subtitle
+  sbOpen(ic(type), name, path);
+  curPath=path;dirty=false;
+  const backBtn = fromSearch
+    ? `<button class="btn bn" id="fpback" style="font-size:11px;height:26px;padding:0 9px">← Results</button>`
+    : '';
+  $('sbb').innerHTML=`
+    <div id="fp">
+      <div id="fpa" style="border-bottom:1px solid var(--bdr)">
+        ${backBtn}
+        <button class="btn bn" id="fpeb">✏️ Edit</button>
+        <button class="btn bn" id="fppb">📡 Propagate same type</button>
+        <button class="btn bn" id="fpfb" title="Find in file (Ctrl+F)">🔍</button>
+      </div>
+      <div id="fpfind" style="display:none;align-items:center;gap:5px;padding:5px 0;flex-shrink:0">
+        <input id="fpfi" placeholder="Find in file…" autocomplete="off"
+          style="flex:1;height:26px;background:var(--sur2);border:1px solid var(--bdr);
+                 border-radius:4px;color:var(--txt);padding:0 8px;font-size:12px;outline:none">
+        <span id="fpfc" style="font-size:11px;color:var(--dim);white-space:nowrap;min-width:40px;text-align:center"></span>
+        <button class="btn bn" id="fpfp" style="height:26px;padding:0 8px;font-size:13px" title="Previous (Shift+Enter)">↑</button>
+        <button class="btn bn" id="fpfn" style="height:26px;padding:0 8px;font-size:13px" title="Next (Enter)">↓</button>
+        <button class="btn bn" id="fpfx" style="height:26px;padding:0 7px;font-size:13px" title="Close (Esc)">✕</button>
+      </div>
+      <textarea id="fpta" readonly spellcheck="false" style="padding:11px 0">Loading…</textarea>
+      <div id="fpft" style="display:none">
+        <span id="fpst"></span>
+        <button class="btn bn" id="fpcn">Cancel</button>
+        <button class="btn bc" id="fpsv">💾 Save</button>
+      </div>
+    </div>`;
+  try{
+    const d=await api('/api/file?path='+encodeURIComponent(path));
+    origContent=d.content;$('fpta').value=d.content;
+  }catch(e){$('fpta').value='⚠️ '+e.message;}
+  $('fpta').addEventListener('input',()=>{
+    if(!$('fpta').readOnly){dirty=true;$('fpst').textContent='● unsaved';$('fpst').style.color='var(--or)';}
+  });
+  $('fpeb').addEventListener('click',()=>{
+    const ta=$('fpta');
+    if(ta.readOnly){ta.readOnly=false;ta.style.background='#0d0d20';
+      $('fpeb').textContent='🔒 View';$('fpeb').className='btn bd';$('fpft').style.display='flex';ta.focus();}
+    else{ta.readOnly=true;ta.style.background='';
+      $('fpeb').textContent='✏️ Edit';$('fpeb').className='btn bn';if(!dirty)$('fpft').style.display='none';}
+  });
+  $('fppb').addEventListener('click',()=>{
+    const node=G.nodes.find(n=>n.path===path);if(node)startTypePropMode(node);
+  });
+  $('fpsv').addEventListener('click',saveFile);
+  $('fpcn').addEventListener('click',()=>{
+    $('fpta').value=origContent;$('fpta').readOnly=true;$('fpta').style.background='';
+    $('fpeb').textContent='✏️ Edit';$('fpeb').className='btn bn';$('fpft').style.display='none';$('fpst').textContent='';dirty=false;
+  });
+  // Back to search results
+  if($('fpback')) $('fpback').addEventListener('click',()=>{
+    const q=$('si').value.trim();
+    if(q.length>=2) doSearch(q); else sbClose();
+  });
+
+  // ── Find in file ─────────────────────────────────────────────────────────
+  let _fmatch=[],_fmi=0;
+  function fpFindOpen(){
+    $('fpfind').style.display='flex';
+    $('fpfi').focus();$('fpfi').select();
+  }
+  function fpFindClose(){
+    $('fpfind').style.display='none';
+    $('fpfi').value='';$('fpfc').textContent='';_fmatch=[];_fmi=0;
+    $('fpta').focus();
+  }
+  function fpFindRun(dir=1){
+    const q=$('fpfi').value;
+    const ta=$('fpta');const txt=ta.value;
+    if(!q){$('fpfc').textContent='';return;}
+    // Build all match positions
+    _fmatch=[];
+    const ql=q.toLowerCase(),tl=txt.toLowerCase();
+    let i=0;while((i=tl.indexOf(ql,i))!==-1){_fmatch.push(i);i+=ql.length;}
+    if(!_fmatch.length){$('fpfc').textContent='no match';$('fpfc').style.color='var(--re)';return;}
+    // Advance index
+    _fmi=(_fmi+dir+_fmatch.length)%_fmatch.length;
+    const pos=_fmatch[_fmi];
+    // Do NOT call ta.focus() here — it would steal focus from the find input while typing
+    ta.setSelectionRange(pos,pos+q.length);
+    // Scroll textarea to selection
+    const lines=txt.slice(0,pos).split('\n');
+    const lineH=parseInt(getComputedStyle(ta).lineHeight)||18;
+    ta.scrollTop=Math.max(0,(lines.length-3)*lineH);
+    $('fpfc').textContent=`${_fmi+1}/${_fmatch.length}`;
+    $('fpfc').style.color='var(--cy)';
+  }
+  $('fpfb').addEventListener('click',fpFindOpen);
+  $('fpfx').addEventListener('click',fpFindClose);
+  $('fpfn').addEventListener('click',()=>{fpFindRun(1);$('fpta').focus();});
+  $('fpfp').addEventListener('click',()=>{fpFindRun(-1);$('fpta').focus();});
+  $('fpfi').addEventListener('input',()=>{_fmi=-1;fpFindRun(1);/* keep focus on find input */});
+  $('fpfi').addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();fpFindRun(e.shiftKey?-1:1);}
+    if(e.key==='Escape'){e.preventDefault();fpFindClose();}
+  });
+  $('fpta').addEventListener('keydown',e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key==='f'){e.preventDefault();fpFindOpen();}
+  });
+}
+
+async function saveFile(){
+  if(!curPath)return;const c=$('fpta')?.value;
+  try{
+    await api('/api/file',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:curPath,content:c})});
+    origContent=c;dirty=false;$('fpst').textContent='✓ Saved';$('fpst').style.color='var(--gr)';
+    toast('Saved: '+curPath.split('/').pop(),'ok');
+    setTimeout(()=>{if($('fpst'))$('fpst').textContent='';},3000);
+  }catch(e){toast('Save failed: '+e.message,'er');}
+}
+
+// ── Agent panel ───────────────────────────────────────────────────────────────
+// Store file nodes by index so onclick can reference them safely (no path escaping issues)
+window._apFiles = [];
+
+function showAgentPanel(d){
+  const allFiles = G.nodes.filter(n=>n.group==='file'&&n.agent_id===d.agent_id);
+  const files    = allFiles.filter(n=>!filteredTypes.has(n.type));
+
+  // Priority order for display
+  const typeOrder = ['soul','heartbeat','agents','tools','user','identity','comms','bootstrap','memory','draft','brand','task','readme','document'];
+  files.sort((a,b)=>{
+    const ai=typeOrder.indexOf(a.type), bi=typeOrder.indexOf(b.type);
+    return (ai<0?99:ai)-(bi<0?99:bi);
+  });
+
+  window._apFiles = files;  // safe reference for onclick
+
+  sbOpen('🤖', d.label||d.short, `${files.length} files — click ✏️ to edit`);
+  $('sbb').innerHTML=`
+    <div style="display:flex;flex-direction:column;height:100%">
+      <div style="padding:10px 13px;border-bottom:1px solid var(--bdr);flex-shrink:0">
+        <div style="font-size:11px;color:var(--dim);margin-bottom:8px">Agent node — choose a file to edit below</div>
+        <button class="btn bg" onclick="startAgentPropMode(G.nodes.find(n=>n.id==='${d.id}'))" style="width:100%;margin-bottom:0">📡 Propagate all files</button>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:8px 13px">
+        ${files.map((f,i)=>`
+          <div style="display:flex;align-items:center;gap:7px;padding:5px 8px;
+               background:var(--sur2);border-radius:5px;margin-bottom:3px;border:1px solid transparent"
+               onmouseover="this.style.borderColor='var(--bdr)'" onmouseout="this.style.borderColor='transparent'">
+            <span style="font-size:14px">${ic(f.type)}</span>
+            <span style="font-size:12px;flex:1;color:var(--txt)">${f.label}</span>
+            <button onclick="_apOpenFile(${i})" class="btn bc"
+              style="height:24px;padding:0 10px;font-size:11px;flex-shrink:0">✏️ Edit</button>
+          </div>`).join('')}
+        ${files.length===0?'<div style="color:var(--dim);font-size:12px;margin-top:8px">No visible files (check type filters)</div>':''}
+      </div>
+    </div>`;
+}
+
+window._apOpenFile = function(i){
+  const f = window._apFiles[i];
+  if(!f) return;
+  showFilePanel(f.path, f.label, f.type);
+  setSel(f.id);
+};
+
+// ── Search ────────────────────────────────────────────────────────────────────
+let _st=null;
+$('si').addEventListener('input',e=>{
+  clearTimeout(_st);const q=e.target.value.trim();
+  $('sclr').style.display=q?'block':'none';
+  _st=setTimeout(()=>doSearch(q),320);
+});
+$('sclr').addEventListener('click',()=>{$('si').value='';$('sclr').style.display='none';clearSearch();});
+
+async function doSearch(q){
+  if(!q||q.length<2){clearSearch();return;}
+  try{
+    const d=await api('/api/search?q='+encodeURIComponent(q));
+    const ids=new Set(d.results.filter(r=>!filteredTypes.has(r.type)).map(r=>r.file_id));
+    if(NDs)NDs.classed('dimmed',d=>d.group==='file'&&!ids.has(d.id)&&!filteredTypes.has(d.type))
+              .classed('hit',d=>ids.has(d.id));
+    showSearchPanel(q,d.results.filter(r=>!filteredTypes.has(r.type)));
+  }catch(e){toast('Search: '+e.message,'er');}
+  // Keep focus on search input — prevent sidebar/file panel from stealing it
+  setTimeout(()=>{ if(document.activeElement!=$('si')) $('si').focus(); }, 50);
+}
+
+function clearSearch(){if(NDs)NDs.classed('dimmed',false).classed('hit',false);sbClose();}
+
+// Open a file from search context — shows "← Results" back button
+function openFileFromSearch(path,name,type,fileId){
+  if(NDs)NDs.classed('sel',d=>d.id===fileId);
+  showFilePanel(path,name,type,true/*fromSearch*/);
+}
+
+function showSearchPanel(q,results){
+  sbOpen('🔍',`"${q}"`,`${results.length} file${results.length!==1?'s':''} matched`);
+  if(!results.length){$('sbb').innerHTML='<div style="padding:18px 13px;color:var(--dim);font-size:13px">No matches found.</div>';return;}
+  $('sbb').innerHTML='<div id="sp"></div>';const sp=$('sp');
+  results.forEach(r=>{
+    const fd=document.createElement('div');fd.className='srf';
+    const hdr=document.createElement('div');hdr.className='srfh';
+    // Show filename + path
+    hdr.innerHTML=`
+      <span style="font-size:15px;flex-shrink:0">${ic(r.type)}</span>
+      <div style="flex:1;min-width:0;overflow:hidden">
+        <div class="srfn">${r.name}</div>
+        <div style="font-size:10px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px">${r.path}</div>
+      </div>
+      <span class="srfc">${r.match_count}</span>`;
+    const hl=document.createElement('div');hl.className='srfl';
+    hdr.addEventListener('click',()=>{
+      hl.classList.toggle('op');
+      if(hl.classList.contains('op')) openFileFromSearch(r.path,r.name,r.type,r.file_id);
+    });
+    r.matches.forEach(m=>{
+      const hi=document.createElement('div');hi.className='srfi';
+      const txt=m.line.replace(new RegExp(ex(q),'gi'),x=>`<em>${x}</em>`);
+      hi.innerHTML=`<div class="srfln">Line ${m.line_num}</div><div class="srft">${txt}</div>`;
+      hi.addEventListener('click',()=>openFileFromSearch(r.path,r.name,r.type,r.file_id));
+      hl.appendChild(hi);
+    });
+    fd.appendChild(hdr);fd.appendChild(hl);sp.appendChild(fd);
+  });
+}
+
+// ── Propagation — type-based (file → same-type files across all agents) ───────
+function startTypePropMode(sourceFile){
+  const type=sourceFile.type;
+  // All same-type files across all agents, excluding source, excluding filtered
+  const targets=G.nodes.filter(n=>
+    n.group==='file'&&n.type===type&&n.id!==sourceFile.id&&!filteredTypes.has(n.type)
+  );
+  if(!targets.length){toast(`No other ${type} files found across agents`,'er');return;}
+
+  propMode=true;propAgent=null;propSel.clear();
+  targets.forEach(f=>propSel.add(f.id));
+
+  const involvedAgentIds=new Set(targets.map(f=>f.agent_id));
+  if(NDs){
+    NDs.classed('dimmed',d=>d.id!==sourceFile.id&&!propSel.has(d.id)&&!involvedAgentIds.has(d.agent_id));
+    NDs.classed('sel',d=>d.id===sourceFile.id);
+    NDs.classed('pon',d=>propSel.has(d.id));
+    NDs.classed('poff',false).classed('pagt',false);
+  }
+  showPropPanel(sourceFile,targets,`${ic(type)} All ${type} files`);
+}
+
+// ── Propagation — agent-based (right-click agent → all its files) ─────────────
+function startAgentPropMode(agtNode){
+  propMode=true;propAgent=agtNode;propSel.clear();
+  const files=G.nodes.filter(n=>n.group==='file'&&n.agent_id===agtNode.agent_id&&!filteredTypes.has(n.type));
+  files.forEach(f=>propSel.add(f.id));
+  if(NDs){
+    NDs.classed('dimmed',d=>d.id!==agtNode.id&&!(d.group==='file'&&d.agent_id===agtNode.agent_id));
+    NDs.classed('pagt',d=>d.id===agtNode.id);
+    NDs.classed('pon',d=>propSel.has(d.id));
+    NDs.classed('poff',false).classed('sel',false);
+  }
+  showPropPanel(agtNode,files,'All files in this agent');
+}
+
+function togglePropFile(d){
+  if(isFiltered(d))return;
+  if(propSel.has(d.id)){propSel.delete(d.id);if(NDs)NDs.filter(n=>n.id===d.id).classed('pon',false).classed('poff',true);}
+  else{propSel.add(d.id);if(NDs)NDs.filter(n=>n.id===d.id).classed('pon',true).classed('poff',false);}
+  document.querySelectorAll(`.ppi[data-id="${d.id}"]`).forEach(el=>{
+    el.classList.toggle('on',propSel.has(d.id));
+    const cb=el.querySelector('input');if(cb)cb.checked=propSel.has(d.id);
+  });
+}
+window.togglePropById=function(id){const d=G?.nodes.find(n=>n.id===id);if(d&&!isFiltered(d))togglePropFile(d);};
+
+function showPropPanel(source,targets,subtitle){
+  sbOpen('📡','Propagation Mode',subtitle);
+  $('sbsub').style.color='var(--gr)';
+  $('sbb').innerHTML=`
+    <div id="pp">
+      <h3>📡 Propagation Mode</h3>
+      <p>Type the section to propagate. Click nodes on the map or checkboxes below to toggle targets.
+         <br><b style="color:var(--gr)">Source:</b> ${source.label||source.name||'?'} — content will be copied to selected files.</p>
+      <label class="ppl">Section to propagate:</label>
+      <textarea id="ppta" placeholder="## Section heading&#10;&#10;Content to propagate…"></textarea>
+      <label class="ppl" style="margin-top:11px">Targets (${targets.length}) — click to toggle:</label>
+      <div id="pplist">
+        ${targets.map(f=>`
+          <div class="ppi on" data-id="${f.id}" onclick="togglePropById('${f.id}')">
+            <input type="checkbox" checked style="pointer-events:none;accent-color:var(--gr)">
+            <div style="flex:1">
+              <div class="ppin">${ic(f.type)} ${f.label}</div>
+              <div class="ppip">${f.path}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div id="ppft">
+        <button class="btn bc" id="ppgo" style="flex:1">📡 Propagate</button>
+        <button class="btn bn" id="ppcan">Cancel</button>
+      </div>
+      <div id="ppst"></div>
+    </div>`;
+  let _confirming=false;
+  $('ppgo').addEventListener('click',()=>{
+    if(!_confirming){
+      const n=propSel.size;
+      if(!n){toast('No files selected','er');return;}
+      _confirming=true;
+      $('ppgo').textContent=`✓ Confirm — write to ${n} file${n!==1?'s':''}?`;
+      $('ppgo').className='btn bg';
+      $('ppgo').style.flex='1';
+      setTimeout(()=>{ if(_confirming){_confirming=false;$('ppgo').textContent='📡 Propagate';$('ppgo').className='btn bc';} },5000);
+    } else {
+      _confirming=false;
+      $('ppgo').textContent='📡 Propagate';$('ppgo').className='btn bc';
+      doProp();
+    }
+  });
+  $('ppcan').addEventListener('click',()=>{
+    propMode=false;propAgent=null;propSel.clear();
+    if(NDs)NDs.classed('pon',false).classed('poff',false).classed('pagt',false).classed('dimmed',false).classed('sel',false);
+    sbClose();
+  });
+}
+
+async function doProp(){
+  const section=$('ppta')?.value.trim();
+  if(!section){toast('Enter section text first','er');return;}
+  const targets=[...propSel].map(id=>G.nodes.find(x=>x.id===id)?.path).filter(Boolean);
+  if(!targets.length){toast('No files selected','er');return;}
+  const go=$('ppgo');go.disabled=true;go.textContent='⏳ Writing…';
+  const st=$('ppst');st.textContent='';
+  try{
+    const res=await api('/api/propagate',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({source_path:'',target_paths:targets,section})});
+    const ok=res.results.filter(r=>r.ok).length,fail=res.results.filter(r=>!r.ok).length;
+    st.textContent=`✓ ${ok} updated`+(fail?` · ${fail} failed`:'')+(res.backup_count?` · ${res.backup_count} backed up`:'');
+    st.style.color=fail?'var(--or)':'var(--gr)';
+    toast(`Propagated to ${ok} file${ok!==1?'s':''}`, 'ok');
+  }catch(e){st.textContent='⚠️ '+e.message;st.style.color='var(--re)';}
+  go.disabled=false;go.textContent='📡 Propagate';go.className='btn bc';
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+$('th').addEventListener('click',e=>{showHir=!showHir;e.currentTarget.className='tb'+(showHir?' oh':'');applyLayers();});
+$('to').addEventListener('click',e=>{showOwn=!showOwn;e.currentTarget.className='tb'+(showOwn?' oo':'');applyLayers();});
+$('ts').addEventListener('click',e=>{showSem=!showSem;e.currentTarget.className='tb'+(showSem?' os':'');applyLayers();});
+$('treset').addEventListener('click',resetLayout);
+$('reload').addEventListener('click',()=>{
+  clearSel();sbClose();$('si').value='';$('sclr').style.display='none';selectAllTypes();
+  const btn=$('reload');
+  btn.textContent='⟳ Scanning…';btn.disabled=true;btn.style.color='var(--cy)';
+  load().finally(()=>{btn.textContent='↻ Rescan';btn.disabled=false;btn.style.color='';});
+});
+$('sbx').addEventListener('click',()=>{
+  sbClose();
+  if(propMode){propMode=false;propAgent=null;propSel.clear();
+    if(NDs)NDs.classed('pon',false).classed('poff',false).classed('pagt',false).classed('dimmed',false).classed('sel',false);}
+  clearSel();
+});
+$('legt').addEventListener('click',()=>{
+  const b=$('legb');const op=b.style.display!=='none';
+  b.style.display=op?'none':'grid';
+  $('legt').innerHTML=op?'🗂️ Legend &amp; Filter ▾':'🗂️ Legend &amp; Filter ▴';
+});
+
+// ── Sidebar resize ────────────────────────────────────────────────────────────
+let sbRz=false,sbRzX=0,sbRzW=440;
+$('sbr').addEventListener('mousedown',e=>{sbRz=true;sbRzX=e.clientX;sbRzW=parseInt($('sb').style.width)||440;$('sbr').classList.add('drag');document.body.style.userSelect='none';document.body.style.cursor='ew-resize';});
+document.addEventListener('mousemove',e=>{if(!sbRz)return;const nw=Math.max(280,Math.min(window.innerWidth*.75,sbRzW+(sbRzX-e.clientX)));$('sb').style.width=nw+'px';});
+document.addEventListener('mouseup',()=>{if(sbRz){sbRz=false;$('sbr').classList.remove('drag');document.body.style.userSelect='';document.body.style.cursor='';}});
+
+// ── Network info ──────────────────────────────────────────────────────────────
+async function loadNetInfo(){
+  try{const info=await api('/api/info');
+    $('nls').innerHTML=info.tools.map(t=>`<a class="nl" href="${t.url}" target="_blank">${t.name} ↗</a>`).join('');
+  }catch(e){}
+}
+
+// ── Expose ────────────────────────────────────────────────────────────────────
+window.showFilePanel=showFilePanel;window.setSel=setSel;
+window.startAgentPropMode=startAgentPropMode;
+window.selectAllTypes=selectAllTypes;
+window.deselectAllTypes=deselectAllTypes;
+window.G=null;
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+load().then(()=>{window.G=G;});
+loadNetInfo();
+</script>
+</body>
+</html>
