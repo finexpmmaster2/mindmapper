@@ -4,7 +4,7 @@ Mind Mapper — Workspace Visualizer & Editor
 Interactive mind map for markdown workspaces with optional multi-agent support.
 
 Works standalone with any directory of .md files.
-For multi-agent setups (e.g. OpenClaw), auto-detects agents from agents/*/
+For multi-agent setups (e.g. Mind Mapper), auto-detects agents from agents/*/
 or reads from mindmapper.json config.
 
 Port: 8081 (default)
@@ -323,7 +323,7 @@ def scan_files() -> List[Dict]:
     files = []
     pattern = os.path.join(WORKSPACE_ROOT, "**", "*.md")
     for path in glob.glob(pattern, recursive=True):
-        # Skip hidden dirs WITHIN the workspace only (not parent path like .openclaw)
+        # Skip hidden dirs WITHIN the workspace only (not parent path like .mindmapper)
         rel      = os.path.relpath(path, WORKSPACE_ROOT)
         rel_parts = Path(rel).parts
         if any(p.startswith(".") for p in rel_parts):
