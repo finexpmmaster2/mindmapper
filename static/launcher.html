@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🐾 OpenClaw — Tool Launcher</title>
+<title>🗺️ Mind Mapper — Launcher</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -44,8 +44,8 @@
 </style>
 </head>
 <body>
-<h1>🐾 OpenClaw Tools</h1>
-<p class="subtitle">Local network launcher — all tools on this machine</p>
+<h1>🗺️ Mind Mapper</h1>
+<p class="subtitle">Workspace visualizer — local network launcher</p>
 
 <div id="content"><div class="spinner"></div></div>
 <div id="ip-info"></div>
@@ -69,16 +69,9 @@ async function init() {
     {
       icon: '🗺️',
       name: 'Mind Mapper',
-      desc: 'Visual mind map of all workspace .md files. Search, edit, and propagate across agents.',
-      local: `http://localhost:${info.port}/`,
-      network: `http://${lan}:${info.port}/`,
-    },
-    {
-      icon: '📋',
-      name: 'Mission Control',
-      desc: 'Kanban board for team ops. Track tasks across Ideas → Planning → Ongoing → Completed.',
-      local: 'http://localhost:8080/board',
-      network: `http://${lan}:8080/board`,
+      desc: `Workspace visualizer for markdown files. ${info.agents} agents detected, scanning ${info.workspace}.`,
+      local: info.local,
+      network: info.url,
     },
   ];
 
