@@ -38,7 +38,14 @@ app.add_middleware(
 # ── Workspace root detection ─────────────────────────────────────────────────
 # Priority: MINDMAPPER_WORKSPACE env > mindmapper.json > current directory
 def _detect_workspace() -> str:
-    """Detect workspace root from env, config, or cwd."""
+    """
+    Detect workspace root. Priority:
+    1. MINDMAPPER_WORKSPACE env var (explicit override)
+    2. mindmapper.json config file (local or app directory)
+    3. OPENCLAW_WORKSPACE env var (set by OpenClaw)
+    4. ~/.openclaw/workspace (OpenClaw standard path)
+    5. Current working directory (standalone use)
+    """
     # 1. Explicit env var
     env_ws = os.environ.get("MINDMAPPER_WORKSPACE")
     if env_ws and os.path.isdir(env_ws):
@@ -59,7 +66,15 @@ def _detect_workspace() -> str:
                         return os.path.abspath(ws)
             except Exception:
                 pass
-    # 3. Fall back to current working directory
+    # 3. OpenClaw env var
+    oc_ws = os.environ.get("OPENCLAW_WORKSPACE")
+    if oc_ws and os.path.isdir(oc_ws):
+        return os.path.abspath(oc_ws)
+    # 4. OpenClaw standard path (~/.openclaw/workspace)
+    oc_default = os.path.expanduser("~/.openclaw/workspace")
+    if os.path.isdir(oc_default):
+        return os.path.abspath(oc_default)
+    # 5. Fall back to current working directory
     return os.path.abspath(os.getcwd())
 
 WORKSPACE_ROOT = _detect_workspace()
