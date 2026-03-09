@@ -261,7 +261,9 @@ def _discover_agents() -> List[Dict]:
             agents.insert(0, {"id": "main", "name": "main", "short": "main", "workspace": WORKSPACE_ROOT, "parent": None})
         return agents
 
-    # Try OpenClaw config (~/.openclaw/openclaw.json)
+    # ── Source 1: OpenClaw config (~/.openclaw/openclaw.json) ──
+    # Provides: agent IDs, names, hierarchy (parent-child from workspace nesting)
+    # File ownership is determined separately by matching file paths to agent workspaces
     oc_config = os.path.expanduser("~/.openclaw/openclaw.json")
     if os.path.isfile(oc_config):
         try:
@@ -270,22 +272,30 @@ def _discover_agents() -> List[Dict]:
             oc_agents = oc_cfg.get("agents", {}).get("list", [])
             if oc_agents:
                 agents = []
+                # First agent is always the root (main)
+                root_id = oc_agents[0].get("id", "main")
                 for oc_a in oc_agents:
                     aid = oc_a.get("id", "unknown")
                     name = oc_a.get("identity", {}).get("name", oc_a.get("name", aid))
                     ws = oc_a.get("workspace", "")
+                    # Resolve workspace path
+                    if not ws:
+                        ws = WORKSPACE_ROOT if aid == root_id else os.path.join(WORKSPACE_ROOT, "agents", aid)
+                    elif not os.path.isabs(ws):
+                        ws = os.path.join(WORKSPACE_ROOT, ws)
                     agents.append({
                         "id":        aid,
                         "name":      name if name else aid,
                         "short":     name.split("(")[0].strip() if name and "(" in name else (name or aid),
-                        "workspace": ws if os.path.isabs(ws) else os.path.join(WORKSPACE_ROOT, ws),
-                        "parent":    None if aid == oc_agents[0].get("id") else oc_agents[0].get("id", "main"),
+                        "workspace": ws,
+                        "parent":    None if aid == root_id else root_id,
                     })
                 return agents
         except Exception:
             pass
 
-    # Auto-detect from agents/*/ directories
+    # ── Source 2: Auto-detect from agents/*/ subdirectories ──
+    # No OpenClaw config found — scan workspace for agent folders
     agents = [{"id": "main", "name": "main", "short": "main", "workspace": WORKSPACE_ROOT, "parent": None}]
     agents_dir = os.path.join(WORKSPACE_ROOT, "agents")
     if os.path.isdir(agents_dir):
