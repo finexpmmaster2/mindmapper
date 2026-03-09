@@ -24,14 +24,22 @@ Built for multi-agent AI setups (like [OpenClaw](https://github.com/openclaw/ope
 git clone https://github.com/finexpmmaster2/mindmapper.git
 cd mindmapper
 
-# Install (just 2 packages)
-pip install -r requirements.txt
+# Option 1: One command (auto-creates venv, installs deps, starts server)
+bash start.sh
 
-# Run — point at your workspace
-MINDMAPPER_WORKSPACE=/path/to/your/project python3 app.py
+# Option 2: Manual setup
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python3 app.py
 ```
 
 Open `http://localhost:8081` in your browser.
+
+### Point at your workspace
+```bash
+MINDMAPPER_WORKSPACE=/path/to/your/project bash start.sh
+```
 
 ## Configuration
 
