@@ -70,10 +70,19 @@ def _detect_workspace() -> str:
     oc_ws = os.environ.get("OPENCLAW_WORKSPACE")
     if oc_ws and os.path.isdir(oc_ws):
         return os.path.abspath(oc_ws)
-    # 4. OpenClaw standard path (~/.openclaw/workspace)
-    oc_default = os.path.expanduser("~/.openclaw/workspace")
-    if os.path.isdir(oc_default):
-        return os.path.abspath(oc_default)
+    # 4. OpenClaw config (~/.openclaw/openclaw.json → agents.list[0].workspace)
+    oc_config = os.path.expanduser("~/.openclaw/openclaw.json")
+    if os.path.isfile(oc_config):
+        try:
+            with open(oc_config) as f:
+                oc_cfg = json.load(f)
+            agents_list = oc_cfg.get("agents", {}).get("list", [])
+            if agents_list:
+                ws = agents_list[0].get("workspace", "")
+                if ws and os.path.isdir(ws):
+                    return os.path.abspath(ws)
+        except Exception:
+            pass
     # 5. Fall back to current working directory
     return os.path.abspath(os.getcwd())
 
@@ -245,6 +254,30 @@ def _discover_agents() -> List[Dict]:
         if not has_main:
             agents.insert(0, {"id": "main", "name": "main", "short": "main", "workspace": WORKSPACE_ROOT, "parent": None})
         return agents
+
+    # Try OpenClaw config (~/.openclaw/openclaw.json)
+    oc_config = os.path.expanduser("~/.openclaw/openclaw.json")
+    if os.path.isfile(oc_config):
+        try:
+            with open(oc_config) as f:
+                oc_cfg = json.load(f)
+            oc_agents = oc_cfg.get("agents", {}).get("list", [])
+            if oc_agents:
+                agents = []
+                for oc_a in oc_agents:
+                    aid = oc_a.get("id", "unknown")
+                    name = oc_a.get("identity", {}).get("name", oc_a.get("name", aid))
+                    ws = oc_a.get("workspace", "")
+                    agents.append({
+                        "id":        aid,
+                        "name":      name if name else aid,
+                        "short":     name.split("(")[0].strip() if name and "(" in name else (name or aid),
+                        "workspace": ws if os.path.isabs(ws) else os.path.join(WORKSPACE_ROOT, ws),
+                        "parent":    None if aid == oc_agents[0].get("id") else oc_agents[0].get("id", "main"),
+                    })
+                return agents
+        except Exception:
+            pass
 
     # Auto-detect from agents/*/ directories
     agents = [{"id": "main", "name": "main", "short": "main", "workspace": WORKSPACE_ROOT, "parent": None}]
