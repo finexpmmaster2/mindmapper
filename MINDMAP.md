@@ -1,38 +1,36 @@
 # Mind Mapper — Project File
 
-**Tool:** Memory & Mind Mapper  
+**Tool:** Mind Mapper — Workspace Visualizer & Editor  
 **Port:** 8081  
 **Location:** `agents/developer/tools/mindmapper/`  
-**GitHub:** `finexpmmaster2/mindmapper` (private → going **open source**)  
+**GitHub:** `finexpmmaster2/mindmapper` (private — designed for OpenClaw)  
 **Started:** 2026-03-07  
-**Status:** Active — in testing  
-**Latest commit:** `e1ec6a7`
+**Status:** Active — portable, installable on any OpenClaw machine  
+**Latest commit:** `07ce326`
 
 ---
 
-## ⚠️ UNIVERSAL USE — READ BEFORE EVERY CHANGE
+## ⚠️ DESIGN PRINCIPLES — READ BEFORE EVERY CHANGE
 
-**Mind Mapper is intended for public release as an open-source product.**
+**Mind Mapper is designed for OpenClaw and intended for public release.**
 
-All fixes, features, and design decisions MUST consider universal use:
+All fixes, features, and design decisions MUST consider portability:
 
-- **No hardcoded paths** — use environment variables or config, never absolute paths like `/home/snork/...`
-- **No hardcoded agent names** — agent definitions must come from config, not code constants
-- **No OpenClaw-specific assumptions** — the tool should work with ANY workspace of `.md` files
+- **No hardcoded paths** — use environment variables, `~/.openclaw/openclaw.json`, or auto-detect
+- **No hardcoded agent names** — read from `openclaw.json` or auto-detect from `agents/*/`
 - **No private tokens, keys, or credentials** in code or commits
-- **No internal team references** in user-facing strings (UI, error messages, docs)
-- **Config-driven agent list** — read from a config file (e.g., `mindmapper.json`) or auto-detect from directory structure
-- **Graceful defaults** — if no config exists, scan the workspace and create reasonable defaults
-- **Cross-platform** — avoid Linux-only assumptions; test paths on macOS/Windows where possible
-- **Minimal dependencies** — keep to `fastapi` + `uvicorn` only
+- **No internal team references** in user-facing strings
+- **Graceful defaults** — if no OpenClaw config exists, scan the workspace and create reasonable defaults
+- **Minimal dependencies** — `fastapi` + `uvicorn` only
+- **Auto-venv** — `start.sh` creates `.venv` on first run (no system pip needed)
 
-**Before merging any PR, ask:** "Would this work for someone who just cloned the repo and ran it on their own project?"
+**Before merging any PR, ask:** "Would this work for someone who just cloned the repo and ran `bash start.sh` on their own OpenClaw instance?"
 
 ---
 
 ## Purpose
 
-Visual interactive mind map + file editor for `.md` workspaces. Originally built for multi-agent OpenClaw deployments, but designed to work with any markdown-based project.
+Visual interactive mind map + file editor for OpenClaw workspaces. Scans all `.md` files, shows agent hierarchy, file ownership, and cross-references.
 
 ---
 
@@ -49,37 +47,45 @@ Visual interactive mind map + file editor for `.md` workspaces. Originally built
 
 ---
 
+## Workspace & Agent Detection
+
+### Detection Priority (workspace root)
+
+1. `MINDMAPPER_WORKSPACE` env var (explicit override)
+2. `mindmapper.json` config file (local or app directory)
+3. `OPENCLAW_WORKSPACE` env var
+4. **`~/.openclaw/`** — auto-detected if `openclaw.json` exists there
+5. Current working directory (fallback for standalone use)
+
+### Agent Discovery Priority
+
+1. `mindmapper.json` → `"agents"` array (full control)
+2. **`~/.openclaw/openclaw.json`** → `agents.list` (hierarchy from config)
+3. Auto-detect from `agents/*/` subdirectories + `SOUL.md` name extraction
+
+### How It Works
+
+- **Hierarchy** (agent → sub-agent): read from `~/.openclaw/openclaw.json`
+- **Ownership** (file → agent): determined by matching file paths to agent workspace directories
+- **Semantic links** (file → agent): detected from cross-agent mentions in file content
+
+---
+
 ## File Structure
 
 ```
 tools/mindmapper/
-├── app.py              # FastAPI backend — scan, search, save, propagate, semantic
-├── requirements.txt    # fastapi, uvicorn
-├── start.sh            # Launch script — localhost default, --lan flag for LAN
-├── README.md           # Public-ready documentation
-├── MINDMAP.md          # This project file
+├── app.py                  # FastAPI backend — scan, search, save, propagate
+├── requirements.txt        # fastapi, uvicorn
+├── start.sh                # Launch script — auto-venv, localhost/LAN modes
+├── README.md               # Installation & usage docs
+├── MINDMAP.md              # This project file
+├── mindmapper.example.json # Example config for custom setups
+├── .gitignore              # Excludes .venv, __pycache__, mindmapper.json
 └── static/
-    ├── index.html      # Self-contained frontend (D3.js + CSS + JS)
-    └── launcher.html   # Tool landing page with local + LAN links
+    ├── index.html          # Self-contained frontend (D3.js + CSS + JS)
+    └── launcher.html       # Landing page with connection info
 ```
-
----
-
-## Agent Hierarchy
-
-Currently hardcoded in `app.py` as `AGENTS` list. **TODO: make config-driven** — read from `mindmapper.json` or auto-detect from workspace directory structure.
-
-```
-# Current OpenClaw deployment:
-main       (Zaza)   workspace root
-├── researcher (Nino)   agents/researcher
-├── developer  (Devi)   agents/developer
-├── social     (Soso)   agents/social
-├── maro       (Maro)   agents/maro
-└── qa         (Sako)   agents/qa
-```
-
-**For open-source release:** Agent list should be auto-detected from `agents/*/` subdirectories, with optional `mindmapper.json` override for names, hierarchy, and custom workspace paths.
 
 ---
 
@@ -88,13 +94,15 @@ main       (Zaza)   workspace root
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/` | Mind Mapper UI |
-| GET | `/launcher` | Tool landing page (local + LAN links) |
-| GET | `/api/graph` | Full graph: nodes, hierarchy/ownership/semantic edges |
+| GET | `/launcher` | Landing page with server info |
+| GET | `/api/graph` | Full graph: nodes + hierarchy/ownership/semantic edges |
 | GET | `/api/file?path=` | Read file content |
 | POST | `/api/file` | Save file `{path, content}` |
-| GET | `/api/search?q=` | Full-text search, returns matches with line numbers |
-| POST | `/api/propagate` | Propagate section `{source_path, target_paths[], section}` |
-| GET | `/api/info` | LAN IP + tool URLs |
+| GET | `/api/search?q=` | Full-text search with line numbers |
+| POST | `/api/propagate` | Smart-merge content to multiple files |
+| POST | `/api/rescan` | Force re-discovery of agents and files |
+| GET | `/api/backups` | Backup status and history |
+| GET | `/api/info` | Server info (IP, port, workspace, agent count) |
 
 ---
 
@@ -111,8 +119,6 @@ main       (Zaza)   workspace root
 | Hierarchy | cyan thick | agent → sub-agent | ⬡ Hierarchy button |
 | Ownership | blue medium | agent → its files | 📂 Ownership button |
 | Semantic | purple dashed | file → agent node | ~ Semantic button |
-
-**Semantic edge rule:** source = actual file containing the cross-agent mention (file node); target = agent node of the mentioned agent. Edges hide when source file type is filtered. Target is always an agent node so it's never hidden by file-type filters.
 
 ---
 
@@ -149,13 +155,41 @@ bash start.sh --lan
 MINDMAPPER_HOST=0.0.0.0 python3 app.py
 ```
 
-LAN mode shows a `⚠️ WARNING` on startup. No authentication — rely entirely on network trust. Never expose to untrusted networks.
+⚠️ No authentication — rely entirely on network trust. Never expose to untrusted networks.
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MINDMAPPER_WORKSPACE` | auto-detect | Root directory to scan |
+| `MINDMAPPER_HOST` | `127.0.0.1` | Bind address |
+| `MINDMAPPER_PORT` | `8081` | Server port |
+| `MINDMAPPER_BACKUP_DIR` | `<workspace>/.mindmapper_backups` | Backup location |
+| `MINDMAPPER_BACKUP_DAYS` | `7` | Backup retention days |
+| `OPENCLAW_WORKSPACE` | — | OpenClaw workspace override |
+
+---
+
+## Scanner Rules
+
+Scans all `*.md` files under workspace root recursively.
+
+**Always excluded:**
+- Hidden directories (`.git`, `.cache`, etc.)
+- `backups/`, `backup/`, `.backups/`, `.mindmapper_backups/`
+- `node_modules/`, `__pycache__/`, `venv/`, `.venv/`
+- `dist/`, `build/`, `_site/`
+- Files: `LICENSE*`, `LICENCE*`, `CHANGELOG*`, `COPYING*`, `NOTICE*`
+
+**Configurable exclusions** via `mindmapper.json` → `"skip_dirs": [...]`
 
 ---
 
 ## Semantic Edge Detection
 
-Cross-agent only. One edge per `(src_file_type, src_agent, tgt_agent)` ordered triple — so SOUL.md and AGENTS.md from the same agent can each contribute their own edge to the same target.
+Cross-agent only. One edge per `(src_file_type, src_agent, tgt_agent)` triple.
 
 **Sources scanned:**
 1. Agent name mentions (`\bNino\b`, etc.) → source file → target agent node
@@ -163,122 +197,55 @@ Cross-agent only. One edge per `(src_file_type, src_agent, tgt_agent)` ordered t
 3. Wiki links `[[file]]` → source file → target file's agent node
 
 **Key design decisions:**
-- Target is always an AGENT NODE (not a file) — so semantic edges don't vanish when specific target file types are filtered
-- Source is the ACTUAL file containing the mention — so edges hide correctly when that file type is filtered
-- Dedup key includes source file type — prevents SOUL.md from claiming all agent pairs before AGENTS.md can register its own edges
+- Target is always an AGENT NODE (not a file)
+- Source is the ACTUAL file containing the mention
+- Dedup key includes source file type — prevents one type from claiming all pairs
 
 ---
 
-## Smart Merge / Propagation Logic
+## Installation (any OpenClaw machine)
 
-```python
-def smart_merge(existing: str, section: str) -> str:
-    # Take first non-empty line of section as key
-    # If key found in existing → find that paragraph, replace in-place
-    # If not found → append to end of file
+```bash
+git clone https://github.com/finexpmmaster2/mindmapper.git
+cd mindmapper
+bash start.sh
 ```
 
-Prevents duplicates when propagating incrementally (re-running same propagation updates instead of duplicating).
+`start.sh` auto-creates a `.venv`, installs deps, detects `~/.openclaw/`, and starts the server.
+
+**Prerequisites:** Python 3.8+, `python3-venv` package (Ubuntu: `sudo apt install python3-venv`)
 
 ---
 
-## Scanner Rules
-
-Scans all `*.md` files under `WORKSPACE_ROOT` recursively.
-
-**Excluded:**
-- Hidden directories (`.git`, `.cache`, etc.) — checked on relative path only
-- `backups/`, `backup/`, `.backups/` folders
-- Files: `LICENSE*`, `LICENCE*`, `CHANGELOG*`, `COPYING*`, `NOTICE*`
-
-**Critical fix (2026-03-07):** scanner previously checked absolute path for hidden dirs — `.openclaw` in `/home/snork/.openclaw/workspace` matched and filtered out ALL files. Fixed to check relative path only.
-
----
-
-## Bugs Fixed (session log)
+## Bugs Fixed
 
 | # | Bug | Root Cause | Fix |
 |---|-----|-----------|-----|
-| 1 | 0 files shown | Hidden-dir check on absolute path — `.openclaw` killed everything | Check only relative path from workspace root |
-| 2 | Emoji icons blank | SVG `<text>` can't render emoji reliably | Switched to `<foreignObject>` + HTML `<div>` |
-| 3 | All semantic edges hide when Soul filtered | Semantic detection forced SOUL→SOUL edges (upgraded source to SOUL.md) | Source = actual file; target = agent node |
-| 4 | 140 semantic edges (too many) | Every file mentioning a name generated a separate edge | Dedup per `(src_type, src_agent, tgt_agent)` — one per file-type × agent pair |
-| 5 | AGENTS.md semantic edges swallowed | SOUL.md (higher priority) claimed all `(src_agent, tgt_agent)` pairs first; AGENTS.md had nothing left | Include src_file_type in dedup key |
-| 6 | Filtered nodes still had edges | Edge opacity updated only in `tick()` — stops after simulation settles | Standalone `applyEdgeFilter()` with CSS `display:none`, called on every filter change |
-| 7 | agents type invisible | Color `#00f0ff` same as Hierarchy edge cyan | Changed to `#ff66aa` (pink/magenta) |
-| 8 | Backups folder indexed | No exclusion | Added `backups/`, `backup/`, `.backups/` to exclusion list |
-| 9 | LAN access on by default (security) | `0.0.0.0` hardcoded as bind host | Default `127.0.0.1`; `--lan` flag for opt-in |
-| 10 | Agent node not editable | No obvious edit action; inline onclick had path escaping bugs | File refs stored in `window._apFiles[]`; explicit ✏️ Edit button per file; agent click opens SOUL.md directly |
-| 11 | Maro AGENTS.md only connected to Soso | SOUL.md scanned first, claimed all `(maro, *)` pairs before AGENTS.md ran | Dedup key `(src_type, src_agent, tgt_agent)` — each file type gets its own slot |
-
----
-
-## Parked Ideas
-
-### 💡 Export / Import / Backup-Restore
-**Status:** Parked — GG to revisit after testing
-
-Full workspace portability system integrated into Mind Mapper:
-
-**Export bundle** (`.zip`):
-```
-openclaw-backup-YYYY-MM-DD.zip
-├── openclaw.json
-├── agents/
-│   ├── zaza/SOUL.md
-│   ├── zaza/AGENTS.md
-│   └── ...          ← core types: soul/agents/tools/heartbeat/identity/user/comms
-└── manifest.json    ← version, timestamp, agent list, checksum
-```
-
-**Features:**
-- One-click full export → download `.zip`
-- Selective export: per agent + per file type checkboxes
-- Import: drag & drop → validate manifest → diff preview → write files
-- Auto-backup on every save: `backups/YYYY-MM-DD/HH-MM-SS_<path>.md`
-- Auto-backup batch before propagation: `backups/propagate_HH-MM-SS/`
-
-**Use cases:**
-- Migrate OpenClaw to new machine in 30 seconds
-- Clone agent configuration
-- Share "starter packs" — publish agent personality bundles
-- Point-in-time restore after bad edit
-- Community agent sharing
-
-**API additions needed:**
-- `GET /api/export` → streams `.zip`
-- `POST /api/import` → accepts `.zip`, returns diff
-- `POST /api/restore` → applies diff after confirmation
+| 1 | 0 files shown | Hidden-dir check on absolute path | Check only relative path |
+| 2 | Emoji icons blank | SVG `<text>` can't render emoji | `<foreignObject>` + HTML |
+| 3 | Semantic edges hide wrong | Source forced to SOUL.md | Source = actual file |
+| 4 | 140 semantic edges | No dedup | Dedup per `(src_type, src_agent, tgt_agent)` |
+| 5 | AGENTS.md edges swallowed | SOUL.md claimed all pairs first | Include src_file_type in key |
+| 6 | Filtered nodes had edges | Edge opacity only in `tick()` | Standalone `applyEdgeFilter()` |
+| 7 | agents type invisible | Same color as hierarchy edges | Changed to pink/magenta |
+| 8 | Backups folder indexed | No exclusion | Added to SKIP_DIRS |
+| 9 | LAN on by default | `0.0.0.0` hardcoded | Default `127.0.0.1`, `--lan` flag |
+| 10 | Agent node not editable | No edit action | ✏️ Edit button, click → SOUL.md |
+| 11 | Hardcoded agent list | Agents in code constants | Auto-detect from `openclaw.json` / `agents/*/` |
+| 12 | Broken venv on first run | `python3-venv` not installed | Detect broken venv, clear error msg |
+| 13 | Wrong workspace on other machines | Hardcoded `/home/snork/...` | Read from `~/.openclaw/openclaw.json` |
 
 ---
 
 ## Roadmap
 
-- [ ] Auto-backup on save and propagate (prerequisite for export feature)
-- [ ] Export / Import / Backup-Restore (see Parked Ideas above)
+- [ ] Config-driven file type system (custom types beyond OpenClaw defaults)
 - [ ] File watcher — auto-refresh graph when workspace files change
 - [ ] Minimap for large graphs (100+ nodes)
 - [ ] Collapse/expand agent subtrees
-- [ ] Jump-to-line highlight inside editor on search result click
 - [ ] Export graph as PNG or SVG
-- [ ] Token-based auth for LAN mode (basic security layer)
-- [ ] Per-agent stats: file count, total size, last modified
-
----
-
-## Start / Restart
-
-```bash
-# Localhost only (default, secure)
-cd /home/snork/.openclaw/workspace/agents/developer/tools/mindmapper
-bash start.sh
-
-# LAN mode (opt-in, explicit)
-bash start.sh --lan
-
-# Kill and restart manually
-lsof -ti:8081 | xargs -r kill -9 && python3 app.py
-```
+- [ ] Token-based auth for LAN mode
+- [ ] Export / Import workspace bundles
 
 ---
 
@@ -288,16 +255,14 @@ lsof -ti:8081 | xargs -r kill -9 && python3 app.py
 |------|-------------|
 | `09f70a6` | Initial build |
 | `3b79dba` | Scanner fix + UX rewrite |
-| `da41b6b` | Exclude backups/ folder |
-| `6782565` | Hide edges with filtered nodes; Select All / Deselect All |
-| `a8d4e71` | Security: localhost default, --lan flag |
-| `f2e4e0b` | Agent panel Edit buttons; click agent → opens SOUL.md |
-| `0e15cf4` | Semantic edges → agent nodes (v2 attempt) |
-| `b51e08c` | Semantic: file→file, exempt from filter (v3) |
-| `eab5571` | Semantic: file→agent node, deduped per agent pair |
-| `73fe92d` | Semantic: source = actual file, target = agent node |
-| `d67e1dd` | Semantic: dedup key includes src file type — AGENTS.md no longer swallowed |
+| `d67e1dd` | Semantic dedup key includes src file type |
+| `1e3215c` | Universal workspace support — auto-detect agents |
+| `6b8b673` | Remove OpenClaw branding from UI |
+| `3e13477` | Auto-create venv on first run |
+| `f8033f4` | Auto-detect OpenClaw workspace from ~/.openclaw |
+| `feb2e29` | Read agents from openclaw.json |
+| `07ce326` | Scan from ~/.openclaw/ root |
 
 ---
 
-*Last updated: 2026-03-07 by Devi*
+*Last updated: 2026-03-09 by Devi*
