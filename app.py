@@ -70,9 +70,11 @@ def _detect_workspace() -> str:
     oc_ws = os.environ.get("OPENCLAW_WORKSPACE")
     if oc_ws and os.path.isdir(oc_ws):
         return os.path.abspath(oc_ws)
-    # 4. OpenClaw config (~/.openclaw/openclaw.json → agents.list[0].workspace)
-    oc_config = os.path.expanduser("~/.openclaw/openclaw.json")
+    # 4. OpenClaw installation (~/.openclaw/)
+    oc_root = os.path.expanduser("~/.openclaw")
+    oc_config = os.path.join(oc_root, "openclaw.json")
     if os.path.isfile(oc_config):
+        # Read workspace from config first
         try:
             with open(oc_config) as f:
                 oc_cfg = json.load(f)
@@ -83,6 +85,10 @@ def _detect_workspace() -> str:
                     return os.path.abspath(ws)
         except Exception:
             pass
+        # Fall back to standard OpenClaw workspace path
+        oc_ws = os.path.join(oc_root, "workspace")
+        if os.path.isdir(oc_ws):
+            return os.path.abspath(oc_ws)
     # 5. Fall back to current working directory
     return os.path.abspath(os.getcwd())
 
