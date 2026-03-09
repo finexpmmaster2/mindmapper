@@ -17,9 +17,20 @@ sleep 0.5
 
 # ── Virtual environment setup ────────────────────────────────────────────────
 VENV_DIR=".venv"
-if [ ! -d "$VENV_DIR" ]; then
+
+# Create or recreate venv if missing or broken
+if [ ! -f "$VENV_DIR/bin/pip" ]; then
+  if [ -d "$VENV_DIR" ]; then
+    echo "⚠️  Broken venv detected — recreating..."
+    rm -rf "$VENV_DIR"
+  fi
   echo "📦 Creating virtual environment..."
-  python3 -m venv "$VENV_DIR"
+  python3 -m venv "$VENV_DIR" || {
+    echo "❌ Failed to create venv."
+    echo "   On Ubuntu/Debian: sudo apt install python3-venv"
+    echo "   Then run: bash start.sh"
+    exit 1
+  }
   echo "📦 Installing dependencies..."
   "$VENV_DIR/bin/pip" install -q -r requirements.txt
   echo "✅ Setup complete."
