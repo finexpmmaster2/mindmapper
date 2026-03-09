@@ -1,0 +1,9 @@
+{
+  "workspace": "/path/to/your/workspace",
+  "skip_dirs": ["vendor", "output"],
+  "agents": [
+    {"id": "main",    "name": "Coordinator",  "short": "Coord",  "workspace": ".",              "parent": null},
+    {"id": "writer",  "name": "Writer Agent", "short": "Writer", "workspace": "agents/writer",  "parent": "main"},
+    {"id": "editor",  "name": "Editor Agent", "short": "Editor", "workspace": "agents/editor",  "parent": "main"}
+  ]
+}
